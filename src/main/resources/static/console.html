@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>网约车多Agent协同调度系统 · 实时调度控制台</title>
+<style>
+  :root{
+    --bg1:#0F1117; --bg2:#1A2233; --card:rgba(255,255,255,.045);
+    --line:rgba(146,84,222,.28); --txt:#E6EAF2; --sub:#9AA7BC;
+    --p1:#722ED1; --p2:#9254DE; --ok:#52C41A; --bad:#FF7A45; --warn:#FAAD14; --blue:#4096FF;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",sans-serif;
+    background:linear-gradient(135deg,var(--bg1) 0%,var(--bg2) 100%);
+    background-attachment:fixed;color:var(--txt);min-height:100vh;overflow-x:hidden;
+  }
+  .bg-grid{position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:linear-gradient(rgba(146,84,222,.05) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(146,84,222,.05) 1px,transparent 1px);
+    background-size:44px 44px;
+    mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 30%,transparent 100%);
+    -webkit-mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,#000 30%,transparent 100%);}
+  .orb{position:fixed;border-radius:50%;filter:blur(90px);opacity:.32;pointer-events:none;z-index:0;}
+  .orb.o1{width:440px;height:440px;background:rgba(114,46,209,.5);top:-150px;right:-110px;animation:drift 16s ease-in-out infinite;}
+  .orb.o2{width:360px;height:360px;background:rgba(64,150,255,.25);bottom:-130px;left:-90px;animation:drift 20s ease-in-out infinite reverse;}
+  @keyframes drift{0%,100%{transform:translate(0,0);}50%{transform:translate(-50px,40px);}}
+  .wrap{position:relative;z-index:1;max-width:1420px;margin:0 auto;padding:0 20px 60px;}
+
+  /* ---------- Hero ---------- */
+  header{padding:48px 0 24px;animation:fadeUp .7s ease both;}
+  .status-pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#B7EB8F;
+    border:1px solid rgba(82,196,26,.4);background:rgba(82,196,26,.08);
+    border-radius:20px;padding:5px 14px;margin-bottom:18px;letter-spacing:1px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:#52C41A;box-shadow:0 0 0 0 rgba(82,196,26,.6);animation:pulse 1.8s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(82,196,26,.55);}70%{box-shadow:0 0 0 8px rgba(82,196,26,0);}100%{box-shadow:0 0 0 0 rgba(82,196,26,0);}}
+  h1{font-size:33px;letter-spacing:2px;line-height:1.25;
+    background:linear-gradient(90deg,#B37FEB,#9254DE 55%,#69B1FF);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  .subtitle{margin-top:12px;font-size:14px;color:var(--sub);line-height:1.9;max-width:860px;}
+  .subtitle b{color:#D9C8FF;font-weight:600;}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px;}
+  .chip{font-size:11.5px;border:1px solid var(--line);background:var(--card);border-radius:20px;
+    padding:4px 14px;color:var(--sub);letter-spacing:.5px;transition:.25s;}
+  .chip:hover{color:#D9C8FF;border-color:var(--p2);transform:translateY(-2px);}
+
+  /* ---------- KPI ---------- */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0 20px;}
+  @media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr);}}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 18px;
+    position:relative;overflow:hidden;animation:fadeUp .7s ease both;}
+  .kpi::after{content:"";position:absolute;right:-24px;top:-24px;width:80px;height:80px;border-radius:50%;
+    background:radial-gradient(circle,rgba(146,84,222,.22),transparent 70%);}
+  .kpi .v{font-family:Consolas,monospace;font-size:27px;font-weight:700;color:#E9DFFF;}
+  .kpi .v small{font-size:13px;color:var(--sub);font-weight:400;margin-left:2px;}
+  .kpi .k{font-size:11.5px;color:var(--sub);letter-spacing:1.5px;margin-top:4px;}
+
+  /* ---------- 拓扑 ---------- */
+  .topo{padding:16px;display:grid;grid-template-columns:210px 1fr;gap:14px;align-items:center;}
+  @media(max-width:900px){.topo{grid-template-columns:1fr;}}
+  .hub{border:1px solid rgba(146,84,222,.55);border-radius:14px;text-align:center;padding:16px 10px;
+    background:linear-gradient(135deg,rgba(114,46,209,.22),rgba(146,84,222,.1));
+    box-shadow:0 0 26px rgba(114,46,209,.25) inset;position:relative;overflow:hidden;}
+  .hub::before{content:"";position:absolute;inset:0;
+    background:linear-gradient(120deg,transparent 30%,rgba(217,200,255,.12) 50%,transparent 70%);
+    animation:sheen 3.2s linear infinite;}
+  @keyframes sheen{from{transform:translateX(-100%);}to{transform:translateX(100%);}}
+  .hub .hn{font-size:15px;font-weight:700;color:#E9DFFF;letter-spacing:1px;}
+  .hub .hd{font-size:10.5px;color:var(--sub);margin-top:6px;line-height:1.7;}
+  .hub .msg{font-family:Consolas,monospace;font-size:22px;color:#fff;margin-top:8px;font-weight:700;}
+  .agents7{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  @media(max-width:700px){.agents7{grid-template-columns:repeat(2,1fr);}}
+  .ag{border:1px solid var(--line);border-radius:12px;padding:9px 11px;background:rgba(255,255,255,.03);transition:.25s;position:relative;}
+  .ag .an{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:6px;}
+  .ag .ad{font-size:10px;color:var(--sub);margin-top:3px;line-height:1.6;}
+  .ag.lit{border-color:var(--p2);background:rgba(146,84,222,.14);
+    box-shadow:0 0 0 3px rgba(146,84,222,.16),0 0 20px rgba(146,84,222,.45);transform:translateY(-2px);}
+  .ag .ic{font-size:14px;}
+
+  /* ---------- 生命周期 ---------- */
+  .lifecycle{display:flex;align-items:center;gap:0;padding:16px 16px 8px;flex-wrap:wrap;}
+  .step{display:flex;align-items:center;gap:0;flex:1;min-width:100px;}
+  .step .sc{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);background:rgba(255,255,255,.04);
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-family:Consolas,monospace;color:var(--sub);transition:.35s;flex:none;}
+  .step .sl{font-size:10.5px;color:var(--sub);margin-left:7px;letter-spacing:1px;white-space:nowrap;}
+  .step .ln{flex:1;height:2px;background:rgba(146,84,222,.18);margin:0 10px;min-width:18px;}
+  .step.on .sc{border-color:var(--p2);background:linear-gradient(135deg,var(--p1),var(--p2));color:#fff;
+    box-shadow:0 0 14px rgba(146,84,222,.6);}
+  .step.on .sl{color:#D9C8FF;}
+  .step.done .sc{border-color:rgba(82,196,26,.55);background:rgba(82,196,26,.15);color:#B7EB8F;}
+  .step.done .ln{background:rgba(82,196,26,.35);}
+  .step.bad .sc{border-color:rgba(255,122,69,.6);background:rgba(255,122,69,.16);color:#FFC069;}
+  .step.bad .ln{background:rgba(255,122,69,.3);}
+  #lc-title{padding:12px 16px 0;font-size:11.5px;color:var(--sub);letter-spacing:1px;}
+
+  /* ---------- 三栏主体 ---------- */
+  .shell{display:grid;grid-template-columns:350px 1fr 350px;gap:16px;align-items:start;margin-top:20px;}
+  @media(max-width:1200px){.shell{grid-template-columns:1fr;}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;
+    animation:fadeUp .7s ease both;backdrop-filter:blur(6px);}
+  .card h3{font-size:12.5px;font-weight:600;letter-spacing:2px;color:var(--sub);
+    padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;}
+  .card h3::before{content:"";width:3px;height:12px;border-radius:2px;
+    background:linear-gradient(180deg,var(--p1),var(--p2));}
+  .pad{padding:13px 16px;}
+  label{font-size:11.5px;color:var(--sub);display:block;margin:9px 0 5px;letter-spacing:1px;}
+  input,select{width:100%;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:9px;
+    padding:9px 11px;color:var(--txt);font-size:13px;outline:none;transition:.2s;color-scheme:dark;}
+  input:focus,select:focus{border-color:var(--p2);box-shadow:0 0 0 3px rgba(146,84,222,.15);}
+  .btn{width:100%;border:1px solid rgba(146,84,222,.4);background:rgba(146,84,222,.16);color:#D9C8FF;
+    border-radius:9px;padding:10px;font-size:13px;cursor:pointer;transition:.2s;margin-top:9px;letter-spacing:1px;}
+  .btn:hover{background:rgba(146,84,222,.34);transform:translateY(-1px);}
+  .btn.ok{background:rgba(82,196,26,.16);color:#B7EB8F;border-color:rgba(82,196,26,.4);}
+  .btn.ok:hover{background:rgba(82,196,26,.3);}
+  .btn.bad{background:rgba(255,122,69,.14);color:#FFC069;border-color:rgba(255,122,69,.4);}
+  .btn.bad:hover{background:rgba(255,122,69,.28);}
+  .btn.blue{background:rgba(64,150,255,.14);color:#91CAFF;border-color:rgba(64,150,255,.4);}
+  .btn.blue:hover{background:rgba(64,150,255,.28);}
+  .price{margin-top:11px;padding:11px 13px;background:rgba(146,84,222,.09);border:1px dashed var(--p2);
+    border-radius:11px;font-size:12.5px;line-height:1.8;display:none;animation:fadeUp .4s ease both;}
+  .price b{color:#E9DFFF;font-size:15px;}
+  .chat{display:flex;gap:7px;padding:10px 14px;border-top:1px solid var(--line);}
+  .chat input{flex:1;}
+  .chat .btn{width:auto;margin:0;padding:8px 15px;}
+  #faq{padding:10px 14px;font-size:12.5px;color:#C9D4E8;min-height:54px;line-height:1.7;}
+  #faq .q{color:#91CAFF;}
+  #faq .a{color:#D9C8FF;}
+
+  /* ---------- 事件流 ---------- */
+  #flow{height:330px;overflow-y:auto;padding:10px 14px;font-size:11.5px;font-family:Consolas,monospace;
+    color:var(--sub);display:flex;flex-direction:column;gap:5px;}
+  #flow div{border-left:2px solid var(--p2);padding-left:9px;line-height:1.55;animation:fin .35s;}
+  #flow .tp{color:#D9C8FF;}
+  @keyframes fin{from{opacity:0;transform:translateX(-5px);}to{opacity:1;}}
+  .scroll{max-height:330px;overflow-y:auto;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th,td{padding:7px 10px;text-align:left;border-bottom:1px solid rgba(146,84,222,.12);}
+  th{color:var(--sub);font-weight:600;position:sticky;top:0;background:#141a29;}
+  .tag{display:inline-block;font-size:10.5px;border-radius:5px;padding:2px 9px;letter-spacing:.5px;}
+  .t-g{background:rgba(82,196,26,.15);color:#B7EB8F;}
+  .t-y{background:rgba(250,173,20,.15);color:#FFE58F;}
+  .t-r{background:rgba(255,122,69,.15);color:#FFC069;}
+  .t-b{background:rgba(64,150,255,.15);color:#91CAFF;}
+  .t-p{background:rgba(146,84,222,.18);color:#D9C8FF;}
+  .bar-mini{height:5px;border-radius:3px;background:rgba(255,255,255,.08);width:56px;display:inline-block;vertical-align:middle;margin-right:6px;}
+  .bar-mini>i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--p1),var(--p2));}
+  #notif{font-size:11.5px;color:var(--sub);line-height:1.9;max-height:150px;}
+
+  /* ---------- 架构 ---------- */
+  .arch{margin-top:26px;animation:fadeUp .7s ease both;}
+  .arch-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:0;}
+  @media(max-width:960px){.arch-grid{grid-template-columns:1fr;}}
+  .arch-grid>div{padding:16px;}
+  .arch-grid>div:first-child{border-right:1px solid var(--line);}
+  @media(max-width:960px){.arch-grid>div:first-child{border-right:none;border-bottom:1px solid var(--line);}}
+  .topics{display:flex;flex-direction:column;gap:7px;font-size:11.5px;font-family:Consolas,monospace;}
+  .topics div{display:flex;gap:10px;align-items:center;}
+  .topics .tc{color:#91CAFF;min-width:150px;}
+  .topics .td{color:var(--sub);font-family:"Microsoft YaHei",sans-serif;}
+  .prod{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .prod span{font-size:11px;border:1px solid rgba(64,150,255,.35);color:#91CAFF;border-radius:8px;padding:4px 10px;background:rgba(64,150,255,.08);}
+  .declare{margin:0 16px 16px;padding:12px 14px;border-radius:11px;font-size:12px;line-height:1.9;
+    color:#FFE58F;background:rgba(250,173,20,.07);border:1px dashed rgba(250,173,20,.4);}
+
+  footer{margin-top:28px;padding-top:18px;border-top:1px solid var(--line);
+    display:flex;gap:18px;flex-wrap:wrap;align-items:center;justify-content:space-between;
+    font-size:11.5px;color:var(--sub);animation:fadeUp .7s ease both;}
+  footer b{color:#D9C8FF;}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:rgba(146,84,222,.35);border-radius:4px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div><div class="orb o1"></div><div class="orb o2"></div>
+
+<div class="wrap">
+  <!-- ======== Hero ======== -->
+  <header>
+    <div class="status-pill"><span class="dot"></span>调度中枢在线 · 7 Agents · EventBus 事件驱动 · H2 持久化 · JWT 三角色鉴权</div>
+    <h1>网约车多Agent协同调度系统 <span style="font-size:20px;opacity:.85">实时调度控制台</span></h1>
+    <p class="subtitle">
+      <b>7-Agent Mesh + EventBus</b> 事件驱动架构：下单后事件依次流经
+      <b>风控 → 匹配 → 路径 → 定价 → 通知</b>，多维度打分派单、动态溢价定价、规则风控拦截，
+      客服 Agent 支持价格/取消/纠纷咨询，全链路一次 HTTP 请求内完成。
+      应用端已具备 <b>JWT 三角色（乘客/司机/管理员）· JPA + H2 重启持久化 · vue-pure-admin 管理后台 · E2E 14 项全绿</b>。
+    </p>
+    <div class="chips">
+      <span class="chip">Spring Boot 3.3</span><span class="chip">Java 21</span>
+      <span class="chip">7-Agent Mesh</span><span class="chip">EventBus 事件驱动</span>
+      <span class="chip">打分派单 45/25/20/10</span><span class="chip">动态溢价</span><span class="chip">规则风控</span>
+      <span class="chip">JWT 三角色</span><span class="chip">H2 持久化</span><span class="chip">管理后台</span><span class="chip">E2E 14 项</span>
+    </div>
+  </header>
+
+  <!-- ======== KPI ======== -->
+  <div class="kpis">
+    <div class="kpi"><div class="v" id="k1">0</div><div class="k">累计订单</div></div>
+    <div class="kpi"><div class="v" id="k2">0</div><div class="k">EventBus 消息</div></div>
+    <div class="kpi"><div class="v" id="k3">0<small> / 8</small></div><div class="k">空闲司机</div></div>
+    <div class="kpi"><div class="v" id="k4">0</div><div class="k">已完成/已支付</div></div>
+  </div>
+
+  <!-- ======== 拓扑 ======== -->
+  <div class="card">
+    <h3>Agent Mesh · 实时拓扑（事件经过时节点点亮）</h3>
+    <div class="topo">
+      <div class="hub">
+        <div class="hn">EventBus</div>
+        <div class="hd">Mesh 中枢 · 主题订阅发布<br>order / risk / driver / route<br>price / order.paid / notify</div>
+        <div class="msg" id="hubMsg">0</div>
+        <div class="hd" style="margin-top:2px;">累计消息</div>
+      </div>
+      <div class="agents7">
+        <div class="ag" id="ag-order"><div class="an"><span class="ic">📦</span>订单Agent</div><div class="ad">生命周期<br>创建/支付/取消</div></div>
+        <div class="ag" id="ag-risk"><div class="an"><span class="ic">🛡️</span>风控Agent</div><div class="ad">黑名单 / 刷单<br>异常拦截</div></div>
+        <div class="ag" id="ag-match"><div class="an"><span class="ic">🎯</span>匹配Agent</div><div class="ad">多维打分派单<br>距离45·服务25<br>接单率20·均衡10</div></div>
+        <div class="ag" id="ag-route"><div class="an"><span class="ic">🗺️</span>路径Agent</div><div class="ad">距离 / 时长<br>预估里程</div></div>
+        <div class="ag" id="ag-price"><div class="an"><span class="ic">💰</span>定价Agent</div><div class="ad">基础价 + 里程费<br>动态溢价 / 券</div></div>
+        <div class="ag" id="ag-service"><div class="an"><span class="ic">🎧</span>客服Agent</div><div class="ad">话术 / 工单<br>价格·取消·纠纷</div></div>
+        <div class="ag" id="ag-notify"><div class="an"><span class="ic">📨</span>通知Agent</div><div class="ad">短信 / APP<br>统一推送</div></div>
+        <div class="ag" style="border-style:dashed;opacity:.7;"><div class="an"><span class="ic">👥</span>司机池 8 人</div><div class="ad">状态实时同步<br>接单 / 空闲 · 郑州全域</div></div>
+      </div>
+    </div>
+    <div id="lc-title">订单生命周期 · 最新订单 <b id="lc-id" style="color:#D9C8FF;font-family:Consolas,monospace">—</b></div>
+    <div class="lifecycle" id="lifecycle">
+      <div class="step" data-s="CREATED"><div class="sc">1</div><div class="sl">创建</div><div class="ln"></div></div>
+      <div class="step" data-s="MATCHING"><div class="sc">2</div><div class="sl">风控/匹配</div><div class="ln"></div></div>
+      <div class="step" data-s="DISPATCHED"><div class="sc">3</div><div class="sl">已派单</div><div class="ln"></div></div>
+      <div class="step" data-s="PAID"><div class="sc">4</div><div class="sl">已支付</div><div class="ln"></div></div>
+      <div class="step" data-s="COMPLETED"><div class="sc">5</div><div class="sl">完成</div><div class="ln"></div></div>
+    </div>
+  </div>
+
+  <!-- ======== 三栏 ======== -->
+  <div class="shell">
+    <!-- 左：控制 -->
+    <div>
+      <div class="card">
+        <h3>乘客下单（触发 7-Agent 全链路）</h3>
+        <div class="pad">
+          <label>乘客ID（passenger-996 为黑名单演示）</label>
+          <input id="pid" value="passenger-001">
+          <label>上车点</label>
+          <input id="org" value="郑州东站" readonly>
+          <label>目的地</label>
+          <select id="dst">
+            <option value="新郑机场,34.5280,113.8490">新郑机场（远 · 30km级）</option>
+            <option value="龙子湖,34.7990,113.8140">龙子湖·大学城（远 · 18km级）</option>
+            <option value="二七广场,34.7535,113.6600">二七广场（近 · 4km级）</option>
+            <option value="碧沙岗,34.7540,113.6340">碧沙岗（近 · 6km级）</option>
+          </select>
+          <button class="btn" onclick="createOrder()">发布订单（风控→派单→路径→定价）</button>
+          <div class="price" id="priceBox"></div>
+          <label style="margin-top:12px">订单支付 / 取消</label>
+          <input id="payOrderId" placeholder="输入订单号，如 ORD1001">
+          <button class="btn ok" onclick="pay()">✓ 支付（微信支付）</button>
+          <button class="btn bad" onclick="cancel()">✗ 取消订单（接单后收 30% 空驶补偿）</button>
+        </div>
+        <h3>客服 Agent · 咨询 / 纠纷登记</h3>
+        <div class="chat">
+          <input id="faqQ" placeholder="如：这个价格怎么算的？" onkeydown="if(event.key==='Enter')askFaq()">
+          <button class="btn blue" onclick="askFaq()">发送</button>
+        </div>
+        <div id="faq">客服Agent：可咨询「价格怎么算」「怎么取消」「投诉纠纷」。</div>
+      </div>
+    </div>
+
+    <!-- 中：事件流 -->
+    <div>
+      <div class="card">
+        <h3>EventBus 事件流（风控 → 匹配 → 路径 → 定价 → 通知）</h3>
+        <div id="flow"></div>
+        <h3>通知 Agent · 短信/APP 推送日志</h3>
+        <div id="notif" class="scroll pad"></div>
+      </div>
+    </div>
+
+    <!-- 右：订单与司机 -->
+    <div>
+      <div class="card">
+        <h3>订单列表（订单Agent 全生命周期）</h3>
+        <div class="scroll"><table id="orderT"><thead><tr><th>订单</th><th>状态</th><th>司机</th><th>价格</th></tr></thead><tbody></tbody></table></div>
+        <h3>司机池（匹配Agent 打分：距离45%·服务分25%·接单率20%·均衡10%）</h3>
+        <div class="scroll"><table id="driverT"><thead><tr><th>司机</th><th>服务分</th><th>接单率</th><th>状态</th></tr></thead><tbody></tbody></table></div>
+        <h3>风控演示</h3>
+        <div class="pad" style="font-size:12px;color:var(--sub);line-height:1.9;">
+          乘客 <b style="color:#FFC069">passenger-996</b> 在黑名单 → 下单直接被风控Agent拦截；
+          同一乘客连续下单 3 次触发<b style="color:#FFC069">刷单频次检测</b>。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======== 架构 ======== -->
+  <div class="card arch">
+    <h3>架构 · 事件主题与生产化路径</h3>
+    <div class="arch-grid">
+      <div>
+        <div class="topics">
+          <div><span class="tc">order.created</span><span class="td">订单创建 → 触发风控检测</span></div>
+          <div><span class="tc">risk.passed / rejected</span><span class="td">风控通过/拦截（黑名单、频次、异常）</span></div>
+          <div><span class="tc">order.matching</span><span class="td">进入派单 → 匹配Agent 多维打分</span></div>
+          <div><span class="tc">driver.matched</span><span class="td">司机确定 → 路径Agent 规划</span></div>
+          <div><span class="tc">route.planned</span><span class="td">里程/时长就绪 → 定价Agent 报价</span></div>
+          <div><span class="tc">price.quoted</span><span class="td">基础价+里程费+动态溢价−券</span></div>
+          <div><span class="tc">order.paid / cancelled</span><span class="td">支付成功 / 取消（空驶补偿）</span></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--sub);line-height:2;">
+          应用端：本页走演示口 /api/*；<b style="color:#D9C8FF">JWT 三角色业务口（/api/passenger · /api/driver · /api/admin）+ JPA/H2 重启持久化</b>已落地——E2E 覆盖 admin 登录/黑名单/乘客下单支付/地理自洽/401 防线。生产化路径（面试如实说明）：
+        </div>
+        <div class="prod">
+          <span>EventBus → RocketMQ/Kafka 削峰</span>
+          <span>Store → MySQL + Redis（GEO 司机位置）</span>
+          <span>路径规划 → 高德/百度 API</span>
+          <span>通知 → 短信网关 + 个推</span>
+          <span>压测 → locust / JMeter 自证指标</span>
+        </div>
+      </div>
+    </div>
+    <div class="declare">
+      ⚠️ 诚实声明：本页为<b>应用端实时调度控制台</b>——事件流、打分公式（距离45%·服务分25%·接单率20%·均衡10%）、
+      动态溢价与风控规则均为真实代码实现；订单/司机/黑名单落库 H2，<b>重启不丢</b>（E2E 含重启续单验证）；
+      「支撑 XX 万单/日」等高并发指标<b>未压测前不写入简历</b>，压测方法见 README。
+    </div>
+  </div>
+
+  <footer>
+    <div><b>作品集要点</b> ① Mesh 事件驱动 vs 编排式的取舍 · ② 打分/溢价/风控公式可现场推演 · ③ 生产化组件替换路径清晰 · ④ <a href="/admin/index.html" style="color:#91CAFF;text-decoration:none;border-bottom:1px dashed rgba(145,202,255,.5)">进入管理后台 /admin</a>（admin/admin123）</div>
+    <div>Portfolio App · 陈籼宇</div>
+  </footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const STATUS_TAG = {CREATED:'t-b',MATCHING:'t-y',DISPATCHED:'t-p',PAID:'t-g',COMPLETED:'t-g',CANCELLED:'t-r',RISK_REJECTED:'t-r'};
+const TOPIC_AGENT = [
+  [/^order\./,'order'], [/^risk\./,'risk'], [/^order\.matching|^driver\./,'match'],
+  [/^route\./,'route'], [/^price\./,'price'], [/service|ticket/,'service'], [/notify|push|sms/,'notify']
+];
+const TP_COLOR = {'order.created':'#91CAFF','risk.passed':'#B7EB8F','risk.rejected':'#FFC069',
+  'order.matching':'#FFE58F','driver.matched':'#D9C8FF','route.planned':'#69B1FF','price.quoted':'#FFD591',
+  'order.paid':'#B7EB8F','order.cancelled':'#FFC069'};
+
+/* ---------- KPI ---------- */
+function setKpi(el, target, suffix=''){
+  const cur = parseInt(((el.textContent||'0').split('/')[0]).replace(/\D/g,''))||0;
+  if(cur===target){ return; }
+  const t0=performance.now(), dur=600;
+  (function step(t){
+    const p=Math.min(1,(t-t0)/dur), ease=1-Math.pow(1-p,3);
+    el.innerHTML = Math.round(cur+(target-cur)*ease) + (suffix?'<small>'+suffix+'</small>':'');
+    if(p<1) requestAnimationFrame(step);
+  })(t0);
+}
+
+/* ---------- 拓扑点亮 ---------- */
+function lit(agentKey){
+  const el=$('ag-'+agentKey); if(!el)return;
+  el.classList.add('lit');
+  clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove('lit'),1400);
+}
+function litByTopic(topic){ TOPIC_AGENT.forEach(([re,k])=>{ if(re.test(topic)) lit(k); }); }
+
+/* ---------- 生命周期 ---------- */
+const ORDER_FLOW=['CREATED','MATCHING','DISPATCHED','PAID','COMPLETED'];
+function renderLifecycle(status){
+  const steps=[...document.querySelectorAll('.step')];
+  const bad = status==='CANCELLED'||status==='RISK_REJECTED';
+  const idx = ORDER_FLOW.indexOf(status);
+  steps.forEach((s,i)=>{
+    s.classList.remove('on','done','bad');
+    if(bad){ if(i<=Math.max(idx,1)) s.classList.add('bad'); }
+    else if(idx>=0){ if(i<idx) s.classList.add('done'); else if(i===idx) s.classList.add('on'); }
+  });
+}
+
+/* ---------- 操作 ---------- */
+async function createOrder(){
+  const [name, lat, lng] = $('dst').value.split(',');
+  const r = await fetch('/api/orders', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({passengerId:$('pid').value.trim(), origin:$('org').value, originLat:34.7540, originLng:113.7750,
+                          destination:name, destLat:+lat, destLng:+lng})}).then(r=>r.json());
+  const box = $('priceBox'); box.style.display='block';
+  if(r.status === 'RISK_REJECTED'){
+    box.innerHTML = `⛔ <b style="color:#FF7A45">风控拦截</b>（${r.rejectReason}）订单号 <b>${r.orderId}</b>`;
+    renderLifecycle('RISK_REJECTED');
+  } else {
+    box.innerHTML = `订单 <b>${r.orderId}</b> · 司机 <b>${r.driverId}</b> · 应付 <b>${r.finalPrice} 元</b><br><span style="color:var(--sub)">${r.breakdown||''}</span>`;
+    $('lc-id').textContent = r.orderId;
+    renderLifecycle('DISPATCHED');
+    $('payOrderId').value = r.orderId;
+  }
+  refresh();
+}
+async function pay(){ const id=$('payOrderId').value.trim(); if(!id)return;
+  const r=await fetch(`/api/orders/${id}/pay`,{method:'POST'}).then(r=>r.json());
+  $('lc-id').textContent=id; renderLifecycle(r.status||'PAID'); refresh(); }
+async function cancel(){ const id=$('payOrderId').value.trim(); if(!id)return;
+  await fetch(`/api/orders/${id}/cancel`,{method:'POST'}).then(r=>r.json());
+  $('lc-id').textContent=id; renderLifecycle('CANCELLED'); refresh(); }
+async function askFaq(){
+  const q=$('faqQ').value.trim(); if(!q)return;
+  const id=$('payOrderId').value.trim()||'ORD1001';
+  const r=await fetch(`/api/service?orderId=${id}`,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question:q})}).then(r=>r.json());
+  $('faq').innerHTML = `<span class="q">你：</span>${q}<br><span class="a">客服Agent：</span>${r.answer}`;
+  $('faqQ').value='';
+  lit('service'); refresh();
+}
+
+/* ---------- 轮询 ---------- */
+let lastEventCount=-1;
+async function refresh(){
+  try{
+    const [ev, orders, drivers, notif] = await Promise.all([
+      fetch('/api/events').then(r=>r.json()),
+      fetch('/api/orders').then(r=>r.json()),
+      fetch('/api/drivers').then(r=>r.json()),
+      fetch('/api/notifications').then(r=>r.json())
+    ]);
+    setKpi($('k1'), orders.length);
+    setKpi($('k2'), ev.count);
+    setKpi($('k3'), drivers.filter(d=>d.idle).length, ' / 8');
+    setKpi($('k4'), orders.filter(o=>o.status==='PAID'||o.status==='COMPLETED').length);
+    $('hubMsg').textContent = ev.count;
+
+    /* 新事件 → 点亮拓扑 + 渲染流 */
+    const box=$('flow');
+    const fresh = lastEventCount<0 ? [] : ev.events.slice(lastEventCount);
+    lastEventCount = ev.events.length;
+    fresh.forEach(e=>litByTopic(e.topic));
+
+    box.innerHTML = ev.events.slice(-46).map(e=>{
+      const p=e.payload||{};
+      const txt = p.msg||p.reason||p.breakdown||p.driverName||p.text||(p.amount!=null?('金额 '+p.amount):'');
+      const c = TP_COLOR[e.topic]||'#9254DE';
+      return `<div style="border-left-color:${c}"><span class="tp" style="color:${c}">[${e.topic}]</span> ${e.orderId||''} ${txt||''}</div>`;
+    }).join('');
+    box.scrollTop=box.scrollHeight;
+
+    $('notif').innerHTML = notif.map(n=>`<div>▸ ${n}</div>`).join('');
+    $('orderT').querySelector('tbody').innerHTML = orders.map(o=>`<tr>
+      <td>${o.id}<br><span style="color:var(--sub);font-size:10.5px">${o.route}</span></td>
+      <td><span class="tag ${STATUS_TAG[o.status]||'t-b'}">${o.status}</span></td>
+      <td>${o.driverId||'-'}</td><td>${o.finalPrice>0?o.finalPrice+'元':'-'}</td></tr>`).join('');
+    $('driverT').querySelector('tbody').innerHTML = drivers.map(d=>`<tr>
+      <td>${d.name} <span style="color:var(--sub)">${d.id}</span></td>
+      <td><span class="bar-mini"><i style="width:${d.rating/5*100}%"></i></span>${d.rating}</td>
+      <td>${(d.acceptRate*100).toFixed(0)}%</td>
+      <td><span class="tag ${d.idle?'t-g':'t-y'}">${d.idle?'空闲':'服务中'} · 今日${d.todayOrders}单</span></td></tr>`).join('');
+  }catch(e){}
+}
+refresh(); setInterval(refresh, 2000);
+</script>
+</body>
+</html>
